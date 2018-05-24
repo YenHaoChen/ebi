@@ -1,5 +1,4 @@
 /**************************************************
-By vegetablebird 2018.03.09
   	Big-endian is implemented
 	ebi(0) has positive sign and 1 digit
 	int type is used for indexing, thus MAX_NUM_OF_BITS should not larger than INT_MAX
@@ -11,24 +10,16 @@ By vegetablebird 2018.03.09
 #define __EXTREMELYEASYTOUSEBIGINTEGER__
 
 #include <iostream>
-//#include <cstdint>
-using namespace std;
-
+using std::istream;
+using std::ostream;
+#include <cstdint>
+#ifndef UINT8_MAX
 typedef unsigned char uint8_t;
+#endif
 
 #define MAX_NUM_OF_BITS 10000
 
 class ebi {
-	private:
-		enum {negative, positive} sign;
-		unsigned int N_xdigits;
-		uint8_t *data;
-
-		inline void base_initialization();
-		inline ebi base_addition(const ebi &a, const ebi &b) const;
-		inline ebi base_subtraction(const ebi& a, const ebi& b) const;
-		inline bool base_lessthan(const ebi& a, const ebi& b) const;
-
 	public:
 		//constructors and deconstructor
 		ebi();
@@ -49,9 +40,7 @@ class ebi {
 		ebi operator>>(unsigned int) const;
 
 		//interface functions
-		void Print(); // discarded
-		void GetData(bool&, unsigned int&, uint8_t*); // discarded
-		bool get_sign() const;
+		bool get_sign() const; // discarded
 		unsigned int get_N_xdigits() const;
 		uint8_t get_data(unsigned int) const; // get_xdigit, operator[]
 		friend ostream& operator<<(ostream&, const ebi&);
@@ -80,6 +69,16 @@ class ebi {
 
 		//cast
 		explicit operator int() const;
+
+	private:
+		enum {negative, positive} sign;
+		unsigned int N_xdigits;
+		uint8_t *data;
+
+		inline void base_initialization();
+		inline ebi base_addition(const ebi &a, const ebi &b) const;
+		inline ebi base_subtraction(const ebi& a, const ebi& b) const;
+		inline bool base_lessthan(const ebi& a, const ebi& b) const;
 };
 
 ebi rand(const unsigned digits);

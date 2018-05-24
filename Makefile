@@ -2,7 +2,8 @@ CFLAGS=-Wall -std=c++11
 CFLAGS+=-g
 #CFLAGS+=-O3
 
-all:	demo0
+all:	demo0.cpp ebi.h ebi.cpp
+	g++ -std=c++11 -o demo demo0.cpp ebi.cpp
 
 test:	test_demo0
 
@@ -16,5 +17,5 @@ demo%:	demo%.cpp ebi.h ebi.cpp
 	g++ $(CFLAGS) -o $@ $(patsubst %.h,,$^)
 
 clean:
-	rm -f demo? demo?.tmp
+	rm -f demo demo? demo?.tmp demo?? demo??.tmp
 

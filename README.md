@@ -1,4 +1,4 @@
-# Extremely easy to use Big Integer (EBI)
+# An Extremely easy to use Big Integer (EBI) C++ library
 
 EBI (Extremely easy to use Big Integer) is a multiple precision integer C++ library. The main feature is extremely easy to use. Source code is fairly simple. Basic C/C++ programming knowledge is enough to understand the implementation.
 
@@ -36,6 +36,10 @@ a%b = 0x8a8b52
 Counting from 0 to 9: 0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9
 </code></pre>
 
-##Features
+## Features
 
-- Output hexadecimal format
+- Support both decimal and hexadecimal format
+
+## Implementation guidelines
+
+- Other than constructors and internal functons (base\_\*), all of array pointers, uint8\_t \*data, are pointing allocated and independent memory location

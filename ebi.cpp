@@ -1,5 +1,3 @@
-// By vegetablebird 2018.03.09
-
 #include "ebi.h"
 
 //#define NDEBUG // remove assert()
@@ -327,88 +325,92 @@ ebi ebi::operator%(const ebi &bn) const
 
 //interface functions
 
-void ebi::Print()
-{
-	cout << *this;
-}
-
-void ebi::GetData(bool& s, unsigned int& n, uint8_t* d)
-{
-	s = sign;
-	n = N_xdigits;
-	d = data;
-}
-
 ostream& operator<<(ostream& out, const ebi& bn)
 {
-	ios_base::fmtflags ff = out.flags();
-	if (bn.sign == ebi::negative)
-		out << "-";
-	if (ff & out.dec)
+	if (bn == 0)
 	{
-		list<int> dec_digits;
-		for (ebi i=abs(bn); i!=0; i/=10)
-			dec_digits.push_front((unsigned)(ebi(i%10).data[0]));
-		for (list<int>::iterator it=dec_digits.begin(); it!=dec_digits.end(); it++)
-			cout << *it;
+		cout << "0";
 	}
-	else if (ff & out.hex)
-	{
-		for (int i=bn.N_xdigits-1; i>=0; i--) // big endian
-			out << hex << (unsigned)bn.data[i];
-	}
-	else if (ff & out.oct)
-		assert(false && "Error: octadecimal output format not supported");
 	else
-		assert(false && "Unknown fmtfl basefield");
+	{
+		ios_base::fmtflags ff = out.flags();
+		if (bn.sign == ebi::negative)
+			out << "-";
+		if (ff & out.dec)
+		{
+			list<int> dec_digits;
+			for (ebi i=abs(bn); i!=0; i/=10)
+				dec_digits.push_front((unsigned)(ebi(i%10).data[0]));
+			for (list<int>::iterator it=dec_digits.begin(); it!=dec_digits.end(); it++)
+				cout << *it;
+		}
+		else if (ff & out.hex)
+		{ // it is wire to print a negative number in hexadecimal
+			for (int i=bn.N_xdigits-1; i>=0; i--) // big endian
+				out << hex << (unsigned)bn.data[i];
+		}
+		else if (ff & out.oct)
+			assert(false && "Error: octadecimal output format not supported");
+		else
+			assert(false && "Unknown fmtfl basefield");
+	}
 	return out << dec;
 }
 
 istream& operator>>(istream& in, ebi& bn)
 {
-	bool sign;
-	char c;
-	do {
-		c = in.get();
-//	} while (c==' ' || c=='\n'); // read until first non-space character
-	} while (c!='+' && c!='-' && !isxdigit(c)); // read until first valid character
-	if (c == '+')
-		sign = ebi::positive;
-	else if (c == '-')
-		sign = ebi::negative;
-	else if (isxdigit(c))
+	assert(bn.data);
+
+	char sign;
+	while (isspace(sign=in.get()))
+		continue; // read until first non-space character
+	if (sign != '+' && sign != '-')
 	{
-		sign = ebi::positive;
-		in.putback(c);
-	}
-	else
-	{ // invalid character, intinal to 0
-		cout << "invalid character: '" << c << "', inital to 0" << endl;
-		bn = 0;
-		return in;
+		in.putback(sign);
+		sign = '+';
 	}
 
-	unsigned int N_xdigits = 0;
-	uint8_t data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
-	char c_str[2] = {' ','\0'};
+	char c_str[3] = {' ',' ','\0'};
 	c_str[0] = in.get();
 	c_str[1] = in.get();
-	assert((!strncmp(c_str, "0x", 2) || !strncmp(c_str, "0X", 2)) && "Only support hex string input, e.g. 0x333"); // FIXME
-//	in.putback(c_str[1]);
-//	in.putback(c_str[2]);
-	while (isxdigit(c_str[0]=in.get()))
-	{ // input is little endian, need to turn into big endian
-		data[N_xdigits++] = (uint8_t)strtol(c_str, NULL, 16);
-		assert(N_xdigits < MAX_NUM_OF_BITS);
+	if (strcmp(c_str, "0x") && strcmp(c_str, "0X"))
+	{ // decimal
+		in.putback(c_str[1]);
+		in.putback(c_str[0]);
+		bn = 0;
+		while(isdigit(c_str[0]=in.get()))
+		{
+			bn *= 10;
+			bn += c_str[0] - '0';
+		}
 	}
-	for (int i=0; i<(int)N_xdigits/2; i++)
-	{ // input is little endian, swap into big endian
-		uint8_t temp = data[i];
-		data[i] = data[N_xdigits-i-1];
-		data[N_xdigits-i-1] = temp;
+	else
+	{ // hexadecimal
+		c_str[1] = '\0';
+		list<uint8_t> hex_digits;
+		while ((c_str[0]=in.get()) == '0') // read until first non-zero
+			continue;
+		in.putback(c_str[0]);
+		while (isxdigit(c_str[0]=in.get())) // input is little endian, need to turn into big endian
+			hex_digits.push_front((uint8_t)(strtol(c_str, NULL, 16)));
+		assert(hex_digits.size() < MAX_NUM_OF_BITS);
+
+		if (hex_digits.size() == 0)
+			bn = 0;
+		else
+		{
+			bn.~ebi();
+			bn.N_xdigits = hex_digits.size();
+			bn.data = new uint8_t[bn.N_xdigits];
+			int i = 0;
+			list<uint8_t>::iterator it = hex_digits.begin();
+			while (it != hex_digits.end())
+				bn.data[i++] = *(it++);
+		}
 	}
 
-	bn = ebi(sign, N_xdigits, data);
+	bn.sign = ((bn==0 || sign=='+') ? ebi::positive : ebi::negative);
+
 	return in;
 }
 
@@ -455,7 +457,7 @@ bool ebi::operator>=(const ebi& bn) const
 	return !operator<(bn);
 }
 
-bool ebi::get_sign() const
+bool ebi::get_sign() const // discarded
 {
 	return sign;
 }

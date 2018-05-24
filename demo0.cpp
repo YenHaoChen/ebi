@@ -5,22 +5,18 @@ using namespace std;
 
 int main()
 {
-	ebi a = "0xf1245ab3341ff3461818881767676819ee";
+	ebi a = "12345678901234567890123456789";
+	cout << "Big number a = \"" << a << "\"" << endl;
 	ebi b;
-	cout << "Please keyin a big number: ";
+	cout << "Please keyin a big number, e.g. 9876543210 or 0x24cb016ea:" << endl;
 	cin >> b;
-	cout << "Your number is " << b << "(0x" << hex << b << ")" << endl;
-
+	cout << "Your number, b, is " << b << " (0x" << hex << b << ")" << endl;
+	cout << endl;
 	cout << "a+b = " << a+b << endl;
 	cout << "a-b = " << a-b << endl;
 	cout << "a*b = " << a*b << endl;
 	cout << "a/b = " << a/b << endl;
 	cout << "a\%b = " << a%b << endl;
-
-	cout << "Counting from 0 to 9: ";
-	for (ebi i=0; i<100; i++)
-		cout << i << " ";
-	cout << endl;
 
 	return 0;
 }
