@@ -3,7 +3,6 @@
 #include "ebi.h"
 
 //#define NDEBUG // remove assert()
-//#define DEBUG_BIGNUMBER
 
 #include <iostream>
 #include <iomanip>
@@ -14,54 +13,134 @@
 #include <cstdio>
 #include <climits>
 #include <sstream>
+#include <list>
 using namespace std;
+
+/*** base functions ******************************************************/
+
+inline void ebi::base_initialization()
+{ // initialize to zero
+	sign = positive;
+	N_xdigits = 1;
+	data = new uint8_t[1];
+	data[0] = 0;
+}
+
+inline ebi ebi::base_addition(const ebi& a, const ebi& b) const
+{ // add two positive number
+	assert(a.sign == positive && b.sign == positive);
+
+	if (a == 0)
+		return b;
+	if (b == 0)
+		return a;
+
+	bool result_sign = positive;
+	unsigned int result_N_xdigits = a.N_xdigits>b.N_xdigits? a.N_xdigits : b.N_xdigits;
+	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
+
+	int carry_in = 0;
+	for (int i=0; i<(int)result_N_xdigits; i++)
+	{
+		int sum = a.get_data(i) + b.get_data(i) + carry_in; // i may larger than the N_xdigits of a and b
+		result_data[i] = sum % 16;
+		carry_in = sum / 16;
+	}
+	if (carry_in)
+		result_data[result_N_xdigits++] = carry_in;
+
+	assert(result_N_xdigits < MAX_NUM_OF_BITS);
+	return ebi(result_sign, result_N_xdigits, result_data);
+}
+
+inline ebi ebi::base_subtraction(const ebi& a, const ebi& b) const
+{ // subtracte big positive by small positive number
+	assert(a.sign == positive && b.sign == positive);
+	assert(a >= b);
+
+	if (a == b)
+		return 0;
+
+	bool result_sign = positive;
+	unsigned int result_N_xdigits = a.N_xdigits;
+	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
+
+	int borrow = 0;
+	for (int i=0; i<(int)result_N_xdigits; i++)
+	{
+		int sum = a.data[i] - b.get_data(i) - borrow; // i may larger than b.N_xdigits
+		if (sum >= 0)
+		{
+			borrow = 0;
+			result_data[i] = sum;
+		}
+		else
+		{
+			borrow = 1;
+			result_data[i] = sum + 16;
+		}
+	}
+	while (result_N_xdigits > 1 && result_data[result_N_xdigits-1] == 0)
+		result_N_xdigits--; // remove 0s, leave at least one digit
+
+	return ebi(result_sign, result_N_xdigits, result_data);
+}
+
+inline bool ebi::base_lessthan(const ebi& a, const ebi& b) const
+{ // Compare two positive number
+	assert(a.sign == positive && b.sign == positive);
+
+	if (a.N_xdigits < b.N_xdigits)
+		return true;
+	if (a.N_xdigits > b.N_xdigits)
+		return false;
+	for (int i=a.N_xdigits-1; i>=0; i--)
+	{ // big endian
+		if (a.data[i] < b.data[i])
+			return true;
+		if (a.data[i] > b.data[i])
+			return false;
+	}
+	return false; // equal
+}
+
+/*** base functions *** end **********************************************/
 
 //constructors
 
-#define INITIALIZE() { \
-	sgn = positive; \
-	num_of_bits = 1; \
-	data = new uint8_t[1]; \
-	data[0] = 0; \
-}
-
-
 ebi::ebi()
 {
-	INITIALIZE(); // initialize to zero
+	base_initialization(); // initialize to zero
 }
 
 ebi::ebi(int n)  //directly convert from an int
 {
 	assert(abs(n) >= 0 && "Notice: abs(INT_MIN) is negative, currently only support to INT_MIN+1");
-#ifdef DEBUG_BIGNUMBER
-	cout << "Creating (int)" << n << endl;
-#endif
 	if (n == 0)
 	{
-		INITIALIZE(); // initialize to zero
+		base_initialization(); // initialize to zero
 		return;
 	}
 
-	sgn = n>=0? positive : negative;
+	sign = n>=0? positive : negative;
 	n = abs(n);
-	double num_of_bits_fp = ceil(log2(n)/4.0);
-	assert(num_of_bits_fp == num_of_bits_fp);
-	num_of_bits = (unsigned int)num_of_bits_fp;
-	if (1<<(num_of_bits*4) == n) // power of 16
+	double N_xdigits_fp = ceil(log2(n)/4.0);
+	assert(N_xdigits_fp == N_xdigits_fp);
+	N_xdigits = (unsigned int)N_xdigits_fp;
+	if (1<<(N_xdigits*4) == n) // power of 16
 	{ // n=1, 16, 16^2, 16^3, ...
-		num_of_bits++;
-		assert(num_of_bits < MAX_NUM_OF_BITS);
-		data = new uint8_t[num_of_bits];
-		for (int i=0; i<(int)num_of_bits-1; i++)
+		N_xdigits++;
+		assert(N_xdigits < MAX_NUM_OF_BITS);
+		data = new uint8_t[N_xdigits];
+		for (int i=0; i<(int)N_xdigits-1; i++)
 			data[i] = 0;
-		data[num_of_bits-1] = 1;
+		data[N_xdigits-1] = 1;
 	}
 	else
 	{
-		assert(num_of_bits < MAX_NUM_OF_BITS);
-		data = new uint8_t[num_of_bits];
-		for (int i=0; i<(int)num_of_bits; i++)
+		assert(N_xdigits < MAX_NUM_OF_BITS);
+		data = new uint8_t[N_xdigits];
+		for (int i=0; i<(int)N_xdigits; i++)
 		{ // big endian
 			data[i] = n % 16;
 			n = n / 16;
@@ -69,39 +148,36 @@ ebi::ebi(int n)  //directly convert from an int
 	}
 }
 
-ebi::ebi(bool s, unsigned int n, uint8_t* d)
+ebi::ebi(bool isPositive, unsigned int nXDigits, uint8_t* rawData)
 {
-	if (n == 0 || (n==1 && d[0]==0))
+	if (nXDigits == 0 || (nXDigits==1 && rawData[0]==0))
 	{
-		INITIALIZE(); // initialize to zero
+		base_initialization(); // initialize to zero
 		return;
 	}
 
-	assert(n < MAX_NUM_OF_BITS);
-	sgn = s;
-	num_of_bits = n;
-	data = new uint8_t[num_of_bits];
-	while (num_of_bits > 1 && d[num_of_bits-1] == 0)
-		num_of_bits--; // remove 0s, leave at least one digit
-	for (int i=0; i<(int)num_of_bits; i++)
-		data[i] = d[i];
+	assert(nXDigits < MAX_NUM_OF_BITS);
+	sign = (isPositive ? positive : negative);
+	N_xdigits = nXDigits;
+	data = new uint8_t[N_xdigits];
+	while (N_xdigits > 1 && rawData[N_xdigits-1] == 0)
+		N_xdigits--; // remove 0s, leave at least one digit
+	for (int i=0; i<(int)N_xdigits; i++)
+		data[i] = rawData[i];
 }
 
 ebi::ebi(const ebi& bn)
 {
-#ifdef DEBUG_BIGNUMBER
-	cout << "Copying " << bn << endl;
-#endif
-	sgn = bn.sgn;
-	num_of_bits = bn.num_of_bits;
-	data = new uint8_t[num_of_bits];
-	for (int i=0; i<(int)num_of_bits; i++)
+	sign = bn.sign;
+	N_xdigits = bn.N_xdigits;
+	data = new uint8_t[N_xdigits];
+	for (int i=0; i<(int)N_xdigits; i++)
 		data[i] = bn.data[i];
 }
 
 ebi::ebi(const char* array)
 {
-	INITIALIZE(); // initialize to zero
+	base_initialization(); // initialize to zero
 	istringstream(array) >> *this;
 }
 
@@ -109,55 +185,46 @@ ebi::ebi(const char* array)
 
 ebi::~ebi()
 {
-#ifdef DEBUG_BIGNUMBER
-	cout << "Deleting " << *this << endl;
-#endif
 	assert(data);
 	delete [] data;
 	data = NULL;
 }
 
 //overloaded arithmetic operators as member functions
-ebi ebi::operator+(ebi bn)
+ebi ebi::operator+(const ebi &bn) const
 { // I hope compiler can optimize this...
-#ifdef DEBUG_BIGNUMBER
-	cout << "Adding " << *this << " " << bn << endl;
-#endif
-	if (isNegative() && bn.isNegative())
+	if (sign==negative && bn.sign==negative)
 		return -base_addition(-(*this), -bn);
 
-	if (isPositive() && bn.isNegative() && operator>=(-bn))
+	if (sign==positive && bn.sign==negative && operator>=(-bn))
 		return base_subtraction(*this, -bn);
-	if (isPositive() && bn.isNegative() && operator<(-bn))
+	if (sign==positive && bn.sign==negative && operator<(-bn))
 		return -base_subtraction(-bn, *this);
 
-	if (isNegative() && bn.isPositive() && -(*this)<=bn)
+	if (sign==negative && bn.sign==positive && -(*this)<=bn)
 		return base_subtraction(bn, -(*this));
-	if (isNegative() && bn.isPositive() && -(*this)>bn)
+	if (sign==negative && bn.sign==positive && -(*this)>bn)
 		return -base_subtraction(-(*this), bn);
 
 	return base_addition(*this, bn); // Adding two positive numbers
 }
 
-ebi ebi::operator-(ebi bn)
+ebi ebi::operator-(const ebi &bn) const
 { // I hope compiler can optimize this...
-#ifdef DEBUG_BIGNUMBER
-	cout << "Subtracting " << *this << " " << bn << endl;
-#endif
-	if (isNegative() && bn.isNegative() && -(*this)<=-bn)
+	if (sign==negative && bn.sign==negative && -(*this)<=-bn)
 		return base_subtraction(-bn, -(*this));
-	if (isNegative() && bn.isNegative() && -(*this)>-bn)
+	if (sign==negative && bn.sign==negative && -(*this)>-bn)
 		return -base_subtraction(-(*this), -bn);
 
-	if (isPositive() && bn.isNegative())
+	if (sign==positive && bn.sign==negative)
 		return base_addition(*this, -bn);
 
-	if (isNegative() && bn.isPositive())
+	if (sign==negative && bn.sign==positive)
 		return -base_addition(-(*this), bn);
 
-	if (isPositive() && bn.isPositive() && operator<(bn))
+	if (sign==positive && bn.sign==positive && operator<(bn))
 		return -base_subtraction(bn, *this);
-	//if (isPositive() && bn.isPositive() && operator>=(bn))
+	//if (sign==positive && bn.sign==positive && operator>=(bn))
 	return base_subtraction(*this, bn); // Subing positive numbers, big by small
 }
 
@@ -165,52 +232,43 @@ ebi ebi::operator<<(unsigned int n) const
 {
 	assert (n % 4 == 0); // FIXME
 	n /= 4;
-#ifdef DEBUG_BIGNUMBER
-	cout << "Shifting left " << *this << " by " << n << endl;
-#endif
 	assert(n < MAX_NUM_OF_BITS);
 	if (n == 0 || operator==(0))
 		return *this;
 
-	bool result_sgn = sgn;
-	unsigned int result_num_of_bits = num_of_bits + n;
-	assert(result_num_of_bits < MAX_NUM_OF_BITS);
+	bool result_sign = sign;
+	unsigned int result_N_xdigits = N_xdigits + n;
+	assert(result_N_xdigits < MAX_NUM_OF_BITS);
 	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
 
-	for (int i=num_of_bits-1; i>=0; i--)
+	for (int i=N_xdigits-1; i>=0; i--)
 		result_data[i+n] = data[i];
 	for (int i=0; i<(int)n; i++)
 		result_data[i] = 0;
 
-	return ebi(result_sgn, result_num_of_bits, result_data);
+	return ebi(result_sign, result_N_xdigits, result_data);
 }
 
 ebi ebi::operator>>(unsigned int n) const
 {
 	assert (n % 4 == 0); // FIXME
 	n /= 4;
-#ifdef DEBUG_BIGNUMBER
-	cout << "Shifting right " << *this << " by " << n << endl;
-#endif
-	if (num_of_bits <= n)
+	if (N_xdigits <= n)
 		return 0;
 
-	bool result_sgn = sgn;
-	unsigned int result_num_of_bits = num_of_bits - n;
+	bool result_sign = sign;
+	unsigned int result_N_xdigits = N_xdigits - n;
 	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
 
-	for (int i=n; i<(int)num_of_bits; i++)
+	for (int i=n; i<(int)N_xdigits; i++)
 		result_data[i-n] = data[i];
 
-	return ebi(result_sgn, result_num_of_bits, result_data);
+	return ebi(result_sign, result_N_xdigits, result_data);
 }
 
-ebi ebi::operator*(ebi bn)
+ebi ebi::operator*(const ebi &bn) const
 {
-#ifdef DEBUG_BIGNUMBER
-	cout << "Multiplying " << *this << " " << bn << endl;
-#endif
-	assert(num_of_bits+bn.num_of_bits < MAX_NUM_OF_BITS);
+	assert(N_xdigits+bn.N_xdigits < MAX_NUM_OF_BITS);
 	if (operator==(0) || bn==0)
 		return 0;
 	if (operator==(1))
@@ -223,22 +281,19 @@ ebi ebi::operator*(ebi bn)
 		return -(*this);
 
 	ebi result = 0;
-	for (int i=0; i<(int)bn.num_of_bits; i++)
+	for (int i=0; i<(int)bn.N_xdigits; i++)
 	{
 		ebi sum = 0;
 		for (int j=0; j<(int)bn.data[i]; j++)
 			sum += *this;
 		result += sum << (i*4);
 	}
-	result.sgn = (sgn==bn.sgn) ? positive : negative; // must be assigned lastly
+	result.sign = (sign==bn.sign) ? positive : negative; // must be assigned lastly
 	return result;
 }
 
-ebi ebi::operator/(ebi bn) //integer division: 3/2==1
+ebi ebi::operator/(const ebi &bn) const //integer division: 3/2==1
 {
-#ifdef DEBUG_BIGNUMBER
-	cout << "Dividing " << *this << " " << bn << endl;
-#endif
 	assert(bn != 0 && "divide by zero");
 	if (bn == 1)
 		return *this;
@@ -248,7 +303,7 @@ ebi ebi::operator/(ebi bn) //integer division: 3/2==1
 	ebi divisor = abs(bn);
 	while (temp >= divisor)
 	{
-		unsigned int n = temp.num_of_bits - divisor.num_of_bits;
+		unsigned int n = temp.N_xdigits - divisor.N_xdigits;
 		ebi sub = divisor << (n*4);
 		if (temp >= sub)
 		{
@@ -261,29 +316,13 @@ ebi ebi::operator/(ebi bn) //integer division: 3/2==1
 			result += ebi(1)<<((n-1)*4);
 		}
 	}
-	result.sgn = (sgn==bn.sgn) ? positive : negative; // must be assigned lastly
+	result.sign = (sign==bn.sign) ? positive : negative; // must be assigned lastly
 	return result;
 }
 
-ebi ebi::operator%(ebi bn)
-{ // not support modulus by a negative
-#ifdef DEBUG_BIGNUMBER
-	cout << "Modular " << *this << " " << bn << endl;
-#endif
-	assert(bn > 0 && "Modulo by non-positive number");
-	if (bn == 1)
-		return 0;
-
-	ebi result = abs(*this);
-	while (result >= bn)
-	{
-		unsigned int n = result.num_of_bits - bn.num_of_bits;
-		ebi sub = bn << (n*4);
-		result -= (result>=sub) ? sub : sub>>4;
-	}
-	if (isNegative())
-		result = bn - result;
-	return result;
+ebi ebi::operator%(const ebi &bn) const
+{
+	return (*this) - (((*this)/bn)*bn); // By C99, a == (a/b*b) + a%b
 }
 
 //interface functions
@@ -295,36 +334,51 @@ void ebi::Print()
 
 void ebi::GetData(bool& s, unsigned int& n, uint8_t* d)
 {
-	s = sgn;
-	n = num_of_bits;
+	s = sign;
+	n = N_xdigits;
 	d = data;
 }
 
 ostream& operator<<(ostream& out, const ebi& bn)
 {
-	if (bn.sgn == ebi::negative)
+	ios_base::fmtflags ff = out.flags();
+	if (bn.sign == ebi::negative)
 		out << "-";
-	out << "0x";
-	for (int i=bn.num_of_bits-1; i>=0; i--) // big endian
-		out << hex << (int)bn.data[i];
+	if (ff & out.dec)
+	{
+		list<int> dec_digits;
+		for (ebi i=abs(bn); i!=0; i/=10)
+			dec_digits.push_front((unsigned)(ebi(i%10).data[0]));
+		for (list<int>::iterator it=dec_digits.begin(); it!=dec_digits.end(); it++)
+			cout << *it;
+	}
+	else if (ff & out.hex)
+	{
+		for (int i=bn.N_xdigits-1; i>=0; i--) // big endian
+			out << hex << (unsigned)bn.data[i];
+	}
+	else if (ff & out.oct)
+		assert(false && "Error: octadecimal output format not supported");
+	else
+		assert(false && "Unknown fmtfl basefield");
 	return out << dec;
 }
 
 istream& operator>>(istream& in, ebi& bn)
 {
-	bool sgn;
+	bool sign;
 	char c;
 	do {
 		c = in.get();
 //	} while (c==' ' || c=='\n'); // read until first non-space character
 	} while (c!='+' && c!='-' && !isxdigit(c)); // read until first valid character
 	if (c == '+')
-		sgn = ebi::positive;
+		sign = ebi::positive;
 	else if (c == '-')
-		sgn = ebi::negative;
+		sign = ebi::negative;
 	else if (isxdigit(c))
 	{
-		sgn = ebi::positive;
+		sign = ebi::positive;
 		in.putback(c);
 	}
 	else
@@ -334,47 +388,37 @@ istream& operator>>(istream& in, ebi& bn)
 		return in;
 	}
 
-	unsigned int num_of_bits = 0;
+	unsigned int N_xdigits = 0;
 	uint8_t data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
 	char c_str[2] = {' ','\0'};
 	c_str[0] = in.get();
 	c_str[1] = in.get();
-	assert((!strncmp(c_str, "0x", 2) || !strncmp(c_str, "0X", 2)) && "Only support hex string input, e.g. 0x333");
+	assert((!strncmp(c_str, "0x", 2) || !strncmp(c_str, "0X", 2)) && "Only support hex string input, e.g. 0x333"); // FIXME
 //	in.putback(c_str[1]);
 //	in.putback(c_str[2]);
 	while (isxdigit(c_str[0]=in.get()))
 	{ // input is little endian, need to turn into big endian
-		data[num_of_bits++] = (uint8_t)strtol(c_str, NULL, 16);
-		assert(num_of_bits < MAX_NUM_OF_BITS);
+		data[N_xdigits++] = (uint8_t)strtol(c_str, NULL, 16);
+		assert(N_xdigits < MAX_NUM_OF_BITS);
 	}
-	for (int i=0; i<(int)num_of_bits/2; i++)
+	for (int i=0; i<(int)N_xdigits/2; i++)
 	{ // input is little endian, swap into big endian
 		uint8_t temp = data[i];
-		data[i] = data[num_of_bits-i-1];
-		data[num_of_bits-i-1] = temp;
+		data[i] = data[N_xdigits-i-1];
+		data[N_xdigits-i-1] = temp;
 	}
 
-	bn = ebi(sgn, num_of_bits, data);
+	bn = ebi(sign, N_xdigits, data);
 	return in;
-}
-
-inline bool ebi::isPositive() const
-{
-	return sgn==positive;
-}
-
-inline bool ebi::isNegative() const
-{
-	return sgn==negative;
 }
 
 bool ebi::operator==(const ebi &bn) const
 {
-	if (sgn != bn.sgn)
+	if (sign != bn.sign)
 		return false;
-	if (num_of_bits != bn.num_of_bits)
+	if (N_xdigits != bn.N_xdigits)
 		return false;
-	for (int i=num_of_bits-1; i>=0; i--) // big endian
+	for (int i=N_xdigits-1; i>=0; i--) // big endian
 		if (data[i] != bn.data[i])
 			return false;
 	return true; // equal
@@ -387,11 +431,11 @@ bool ebi::operator!=(const ebi &bn) const
 
 bool ebi::operator<(const ebi &bn) const
 {
-	if (sgn==negative && bn.sgn==negative)
+	if (sign==negative && bn.sign==negative)
 		return base_lessthan(-bn, -(*this));
-	if (sgn==positive && bn.sgn==negative)
+	if (sign==positive && bn.sign==negative)
 		return false;
-	if (sgn==negative && bn.sgn==positive)
+	if (sign==negative && bn.sign==positive)
 		return true;
 	return base_lessthan(*this, bn); // Comparing two positive number
 }
@@ -411,19 +455,19 @@ bool ebi::operator>=(const ebi& bn) const
 	return !operator<(bn);
 }
 
-bool ebi::get_sgn() const
+bool ebi::get_sign() const
 {
-	return sgn;
+	return sign;
 }
 
-unsigned int ebi::get_num_of_bits() const
+unsigned int ebi::get_N_xdigits() const
 {
-	return num_of_bits;
+	return N_xdigits;
 }
 
 uint8_t ebi::get_data(unsigned int i) const
-{ // also deal with i larger than num_of_bits
-	return i<num_of_bits ? data[i] : 0;
+{ // also deal with i larger than N_xdigits
+	return i<N_xdigits ? data[i] : 0;
 }
 
 ebi& ebi::operator=(const ebi& bn)
@@ -455,94 +499,7 @@ ebi& ebi::operator/=(const ebi& bn)
 
 ebi ebi::operator-() const
 {
-#ifdef DEBUG_BIGNUMBER
-	cout << "Negating " << (*this) << " -> " << ebi(!sgn, num_of_bits, data) << endl;
-#endif
-	return ebi(!sgn, num_of_bits, data);
-}
-
-inline ebi ebi::base_addition(const ebi& a, const ebi& b) const
-{ // add two positive number
-	assert(a.isPositive());
-	assert(b.isPositive());
-
-	if (a == 0)
-		return b;
-	if (b == 0)
-		return a;
-
-	bool result_sgn = positive;
-	unsigned int result_num_of_bits = a.num_of_bits>b.num_of_bits? a.num_of_bits : b.num_of_bits;
-	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
-
-	int carry_in = 0;
-	for (int i=0; i<(int)result_num_of_bits; i++)
-	{
-		int sum = a.get_data(i) + b.get_data(i) + carry_in; // i may larger than the num_of_bits of a and b
-		result_data[i] = sum % 16;
-		carry_in = sum / 16;
-	}
-	if (carry_in)
-		result_data[result_num_of_bits++] = carry_in;
-
-	assert(result_num_of_bits < MAX_NUM_OF_BITS);
-	return ebi(result_sgn, result_num_of_bits, result_data);
-}
-
-inline ebi ebi::base_subtraction(const ebi& a, const ebi& b) const
-{ // subtracte big positive by small positive number
-	assert(a.isPositive());
-	assert(b.isPositive());
-	assert(a >= b);
-
-	if (a == b)
-		return 0;
-
-	bool result_sgn = positive;
-	unsigned int result_num_of_bits = a.num_of_bits;
-	uint8_t result_data[MAX_NUM_OF_BITS]; // we may get segmentation fault here
-
-	int borrow = 0;
-	for (int i=0; i<(int)result_num_of_bits; i++)
-	{
-		int sum = a.data[i] - b.get_data(i) - borrow; // i may larger than b.num_of_bits
-		if (sum >= 0)
-		{
-			borrow = 0;
-			result_data[i] = sum;
-		}
-		else
-		{
-			borrow = 1;
-			result_data[i] = sum + 16;
-		}
-	}
-	while (result_num_of_bits > 1 && result_data[result_num_of_bits-1] == 0)
-		result_num_of_bits--; // remove 0s, leave at least one digit
-
-	return ebi(result_sgn, result_num_of_bits, result_data);
-}
-
-inline bool ebi::base_lessthan(const ebi& a, const ebi& b) const
-{ // Compare two positive number
-	assert(a.isPositive());
-	assert(b.isPositive());
-#ifdef DEBUG_BIGNUMBER
-	cout << "Comparing " << a << " < " << b << " ? " << endl;
-#endif
-
-	if (a.num_of_bits < b.num_of_bits)
-		return true;
-	if (a.num_of_bits > b.num_of_bits)
-		return false;
-	for (int i=a.num_of_bits-1; i>=0; i--)
-	{ // big endian
-		if (a.data[i] < b.data[i])
-			return true;
-		if (a.data[i] > b.data[i])
-			return false;
-	}
-	return false; // equal
+	return ebi(!sign, N_xdigits, data);
 }
 
 ebi& ebi::operator++()
@@ -590,42 +547,42 @@ ebi pow(ebi base, unsigned exponent)
 	return n;
 }
 
-ebi operator+(int n, ebi bn)
+ebi operator+(int n, const ebi &bn)
 {
 	return ebi(n) + bn;
 }
 
-ebi operator-(int n, ebi bn)
+ebi operator-(int n, const ebi &bn)
 {
 	return ebi(n) - bn;
 }
 
-ebi operator*(int n, ebi bn)
+ebi operator*(int n, const ebi &bn)
 {
 	return ebi(n) * bn;
 }
 
-ebi operator/(int n, ebi bn)
+ebi operator/(int n, const ebi &bn)
 {
 	return ebi(n) / bn;
 }
 
-ebi operator%(int n, ebi bn)
+ebi operator%(int n, const ebi &bn)
 {
 	return ebi(n) % bn;
 }
 
-bool operator<(int n, ebi bn)
+bool operator<(int n, const ebi &bn)
 {
 	return ebi(n) < bn;
 }
 
-bool operator!=(int n, ebi bn)
+bool operator!=(int n, const ebi &bn)
 {
 	return ebi(n) != bn;
 }
 
-bool operator==(int n, ebi bn)
+bool operator==(int n, const ebi &bn)
 {
 	return ebi(n) == bn;
 }
@@ -633,8 +590,8 @@ bool operator==(int n, ebi bn)
 ebi::operator int() const
 {
 	assert(operator<(INT_MAX) && operator>(INT_MIN+1));
-	int result = data[num_of_bits-1];
-	for (int i=num_of_bits-2; i>=0; i--)
+	int result = data[N_xdigits-1];
+	for (int i=N_xdigits-2; i>=0; i--)
 		result = (result<<4) + data[i];
-	return sgn==positive? result : -result;
+	return sign==positive? result : -result;
 }

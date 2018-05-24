@@ -9,7 +9,7 @@ int main()
 	ebi b;
 	cout << "Please keyin a big number: ";
 	cin >> b;
-	cout << "Your number is " << b << endl;
+	cout << "Your number is " << b << "(0x" << hex << b << ")" << endl;
 
 	cout << "a+b = " << a+b << endl;
 	cout << "a-b = " << a-b << endl;
@@ -18,7 +18,7 @@ int main()
 	cout << "a\%b = " << a%b << endl;
 
 	cout << "Counting from 0 to 9: ";
-	for (ebi i=0; i<10; i++)
+	for (ebi i=0; i<100; i++)
 		cout << i << " ";
 	cout << endl;
 
