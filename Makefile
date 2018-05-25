@@ -8,10 +8,15 @@ all:	demo0.cpp ebi.h ebi.cpp
 test:	test_demo0
 
 test_demo%:	demo%.tmp
-	diff -s $< $(subst tmp,out,$<)
+	@diff -s $< $(subst tmp,out,$<)
 
 demo%.tmp:	demo%
-	./$< < $<.in > $@
+	@if [ -f $<.in ] ; \
+	then \
+		./$< < $<.in > $@ ; \
+	else \
+		./$< > $@ ; \
+	fi
 
 demo%:	demo%.cpp ebi.h ebi.cpp
 	g++ $(CFLAGS) -o $@ $(patsubst %.h,,$^)

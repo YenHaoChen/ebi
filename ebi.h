@@ -1,9 +1,9 @@
 /**************************************************
-  	Big-endian is implemented
+  	Little-endian is implemented
 	ebi(0) has positive sign and 1 digit
-	int type is used for indexing, thus MAX_NUM_OF_BITS should not larger than INT_MAX
+	int type is used for indexing, thus MAX_DATA_LENGTH should not larger than INT_MAX
 	I assume nobody will explicitly call the deconstructor
-		i.e. should not exists a instance with NULL data array
+		i.e. each instance has a valid data array
 **************************************************/
 
 #ifndef __EXTREMELYEASYTOUSEBIGINTEGER__
@@ -17,7 +17,10 @@ using std::ostream;
 typedef unsigned char uint8_t;
 #endif
 
-#define MAX_NUM_OF_BITS 10000
+#define EasyBigInteger ebi
+
+#define MAX_DATA_LENGTH 10000
+#define BYTE_SIZE 8
 
 class ebi {
 	public:
@@ -40,9 +43,8 @@ class ebi {
 		ebi operator>>(unsigned int) const;
 
 		//interface functions
-		bool get_sign() const; // discarded
-		unsigned int get_N_xdigits() const;
-		uint8_t get_data(unsigned int) const; // get_xdigit, operator[]
+		unsigned int get_N_bytes() const;
+		uint8_t get_byte(unsigned int) const;
 		friend ostream& operator<<(ostream&, const ebi&);
 		friend istream& operator>>(istream&, ebi&);
 
@@ -72,7 +74,7 @@ class ebi {
 
 	private:
 		enum {negative, positive} sign;
-		unsigned int N_xdigits;
+		unsigned int N_bytes;
 		uint8_t *data;
 
 		inline void base_initialization();
@@ -80,8 +82,6 @@ class ebi {
 		inline ebi base_subtraction(const ebi& a, const ebi& b) const;
 		inline bool base_lessthan(const ebi& a, const ebi& b) const;
 };
-
-ebi rand(const unsigned digits);
 
 //math library
 ebi abs(const ebi &);
