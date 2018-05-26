@@ -11,13 +11,13 @@ C++ Code:
 	ebi b;
 	cout << "Please keyin a big number, e.g. 9876543210 or 0x24cb016ea:" << endl;
 	cin >> b;
-	cout << "Your number, b, is " << b << " (0x" << hex << b << ")" << endl;
+	cout << "Your number, b, is " << dec << b << " (0x" << hex << b << ")" << endl;
 	cout << endl;
-	cout << "a+b = " << a+b << endl;
-	cout << "a-b = " << a-b << endl;
-	cout << "a*b = " << a*b << endl;
-	cout << "a/b = " << a/b << endl;
-	cout << "a%b = " << a%b << endl;
+	cout << "a+b = " << dec << a+b << endl;
+	cout << "a-b = " << dec << a-b << endl;
+	cout << "a*b = " << dec << a*b << endl;
+	cout << "a/b = " << dec << a/b << endl;
+	cout << "a\%b = " << dec << a%b << endl;
 </code></pre>
 
 Output:
@@ -72,7 +72,8 @@ Under a Windows environment with CodeBlocks 17.12:
 
 ## Implementation guidelines
 
-- Other than constructors and internal functons (base\_\*), all of array pointers, uint8\_t \*data, are pointing allocated and independent memory location
+- Other than constructors and internal functons (base\_\*), all of array pointers, uint8\_t \*data, are pointing allocated and independent memory location.
+- The internal array structure is unsigned (thus, without sign-extension).
 
 ## Development platform
 
