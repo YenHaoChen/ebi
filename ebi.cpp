@@ -302,21 +302,34 @@ ostream& operator<<(ostream& out, const ebi& bn)
 	else
 	{
 		ios_base::fmtflags ff = out.flags();
-		if (bn.sign == ebi::negative)
-			out << "-";
 		if (ff & out.dec)
 		{
+			if (bn.sign == ebi::negative)
+				out << "-";
 			list<int> dec_digits;
 			for (ebi i=abs(bn); i!=0; i/=10)
 				dec_digits.push_front((unsigned)(ebi(i%10).data[0]));
 			for (list<int>::iterator it=dec_digits.begin(); it!=dec_digits.end(); it++)
-				cout << *it;
+				out << *it;
 		}
 		else if (ff & out.hex)
-		{ // it is weir to print a negative number in hexadecimal
-			out << hex << (unsigned)bn.data[bn.N_bytes-1]; // avoid 0 at beginning
-			for (int i=bn.N_bytes-2; i>=0; i--) // little endian
-				out << setw(2) << setfill('0') << hex << (unsigned)bn.data[i];
+		{
+			ios fmt_state(nullptr);
+			fmt_state.copyfmt(out);
+			ebi comp = bn; // output 2's complement
+			if (comp.sign == ebi::negative)
+			{ // translate to 2's complement
+				comp.sign = ebi::positive; // currently not sure how to define this
+				for (int i=0; i<(int)comp.N_bytes; i++)
+					comp.data[i] = ~comp.data[i];
+				comp = comp + 1; // should be considered together with sign
+				if (!(comp.data[comp.N_bytes-1] & (1<<(BYTE_SIZE-1)))) // MSB is not 1, add another byte
+					comp = comp + ((uint8_t(-1)) << (BYTE_SIZE*comp.N_bytes));
+			}
+			out << (unsigned)comp.data[comp.N_bytes-1]; // avoid 0 at beginning
+			for (int i=comp.N_bytes-2; i>=0; i--) // little endian
+				out << setw(BYTE_SIZE/4) << setfill('0') << (unsigned)comp.data[i];
+			out.copyfmt(fmt_state);
 		}
 		else if (ff & out.oct)
 		{ // this part is implemented, but never tested nor executed
@@ -324,12 +337,12 @@ ostream& operator<<(ostream& out, const ebi& bn)
 			for (ebi i=abs(bn); i!=0; i=i>>3)
 				oct_digits.push_front(i.data[0] % 8);
 			for (list<int>::iterator it=oct_digits.begin(); it!=oct_digits.end(); it++)
-				cout << *it;
+				out << *it;
 		}
 		else
 			assert(false && "Unknown fmtfl basefield");
 	}
-	return out << dec;
+	return out;
 }
 
 istream& operator>>(istream& in, ebi& bn)

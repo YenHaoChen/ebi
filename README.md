@@ -1,4 +1,4 @@
-# An very Easy to use Big Integer (EBI) C++ library
+# A very Easy to use Big Integer (EBI) C++ library
 
 The EBI (Easy to use Big Integer) is a multiple precision integer C++ library. The main feature is extremely easy to use. Source code is fairly simple. Basic C/C++ programming knowledge is enough to use and understand the implementation.
 
@@ -80,6 +80,6 @@ Under a Windows environment with CodeBlocks 17.12:
 - x86-64 ISA
 - gcc (GCC) 4.8.5
 
-## Issue raising is welcomed
+## Issue-raising is welcomed
 
 The first motivation of ebi C++ library is simple, easy to use and understand. And, yea, issue raising is welcomed. ^^

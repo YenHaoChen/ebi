@@ -1,6 +1,13 @@
 # Changelog
 
 ## [Unreleased]
+
+## 2018.05.26
+- 2''s complement hexadecimal output format
+- Bug fixing
+- Regression framework is completed; thus, this should be the first stable version
+
+## 2018.05.25
 - sed -i 's/MAX_NUM_OF_BITS/MAX_DATA_LENGTH/g' *
 - sed -i 's/N_xdigits/N_bytes/g' *
 - Reduce memory footprint by half
